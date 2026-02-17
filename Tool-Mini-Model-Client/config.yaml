@@ -1,0 +1,17 @@
+server:
+  url: "http://localhost:8000"
+  timeout: 120                    # seconds to wait for a response
+
+model:
+  enable_thinking: true           # let the model produce a reasoning trace
+
+generation:
+  max_tokens: 512
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 20
+  min_p: 0.0
+  repeat_penalty: 1.0
+
+conversation:
+  max_history_messages: 10        # older turns are dropped to stay within context window
