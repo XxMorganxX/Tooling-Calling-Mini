@@ -40,6 +40,10 @@ Tool-Mini-Model/model_qwen4_finetuning/llama.cpp/
 *.bin
 !requirements*.txt
 
+# ─── Node / frontend ─────────────────────────────────────────────────────────
+node_modules/
+*.tsbuildinfo
+
 # ─── IDE / editor ────────────────────────────────────────────────────────────
 .vscode/
 .idea/
