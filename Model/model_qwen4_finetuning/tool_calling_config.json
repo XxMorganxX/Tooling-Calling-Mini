@@ -1,0 +1,373 @@
+{
+  "system_prompt": "You are a tool-calling assistant. Your job is to analyze user requests and determine the correct tool call(s) to fulfill them.\n\nAVAILABLE TOOLS:\n{tools}\n\nINSTRUCTIONS:\n1. Analyze the user's request carefully\n2. Determine which tool(s) are needed (if any)\n3. Return ONLY a JSON array of tool calls, or an empty array [] if no tool is needed\n\nOUTPUT FORMAT:\nReturn a JSON array where each element has:\n- \"name\": the tool name\n- \"arguments\": object containing the tool's parameters\n\nEXAMPLES:\nUser: \"What's the weather tomorrow?\"\nOutput: [{\"name\": \"weather\", \"arguments\": {\"specific_date\": \"tomorrow\"}}]\n\nUser: \"Turn on the lights and play jazz music\"\nOutput: [{\"name\": \"kasa_lighting\", \"arguments\": {\"interaction\": \"direct\", \"light_name\": \"Light 1\", \"action\": \"on\"}}, {\"name\": \"spotify_playback\", \"arguments\": {\"action\": \"play\", \"query\": \"jazz music\", \"search_type\": \"artist\"}}]\n\nUser: \"Hello, how are you?\"\nOutput: []\n\nRULES:\n- If the request doesn't require any tool, return []\n- For multi-step requests, return multiple tool calls in the array\n- Use natural language dates (like \"tomorrow\", \"monday\") where supported\n- Be precise with tool arguments based on the schemas provided\n- Never explain your reasoning - ONLY return the JSON array",
+  "tools": [
+    {
+      "name": "weather",
+      "description": "Get weather forecast for your current location. Uses hourly forecasts up to 36 hours or daily forecasts beyond that (max 7 days).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168,
+            "description": "Timeframe in hours (1-168). Uses hourly forecasts when <= 36 hours."
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7,
+            "description": "Timeframe in days (1-7)."
+          },
+          "specific_date": {
+            "type": "string",
+            "description": "Get weather for a specific date. Format: 'YYYY-MM-DD' or relative terms like 'today', 'tomorrow', 'monday'."
+          }
+        },
+        "oneOf": [
+          {"required": ["hours"]},
+          {"required": ["days"]},
+          {"required": ["specific_date"]}
+        ]
+      }
+    },
+    {
+      "name": "spotify_playback",
+      "description": "Control Spotify playback: play/pause, track navigation, volume, search, shuffle, repeat.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["play", "pause", "next", "previous", "volume", "search_track", "search_artist", "status", "devices", "shuffle", "repeat"],
+            "description": "The Spotify action to perform."
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query for track or artist when using search actions or 'play' with a query."
+          },
+          "search_type": {
+            "type": "string",
+            "enum": ["track", "artist"],
+            "default": "track",
+            "description": "When using 'play' with a query, choose whether to search tracks or artists."
+          },
+          "volume_level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Volume level percentage (0-100) when action is 'volume'."
+          },
+          "shuffle_state": {
+            "type": "boolean",
+            "description": "For shuffle action: true enables, false disables. If omitted, toggles."
+          },
+          "repeat_mode": {
+            "type": "string",
+            "enum": ["off", "track", "context"],
+            "description": "For repeat action: 'off', 'track' (loop one song), 'context' (loop playlist). If omitted, cycles."
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "kasa_lighting",
+      "description": "Control Kasa smart lights. Direct control (on/off) for individual lights, or apply scenes across rooms.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "interaction": {
+            "type": "string",
+            "enum": ["direct", "scene"],
+            "description": "'direct' to control a single light, 'scene' to apply a preset."
+          },
+          "light_name": {
+            "type": "string",
+            "description": "Specific light to control (direct mode). e.g., 'Light 1', 'Light 2'."
+          },
+          "room": {
+            "type": "string",
+            "description": "Room name for scene target. e.g., 'living room', 'bedroom'."
+          },
+          "action": {
+            "type": "string",
+            "enum": ["on", "off"],
+            "description": "Direct mode action: 'on' or 'off'."
+          },
+          "scene_name": {
+            "type": "string",
+            "enum": ["movie", "work", "mood", "reading", "party", "relax"],
+            "description": "Scene to apply (scene mode)."
+          },
+          "light_names": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional list of specific lights for scene mode instead of room."
+          }
+        },
+        "required": ["interaction"]
+      }
+    },
+    {
+      "name": "calendar_data",
+      "description": "Google Calendar access. Read events or create new events. Use 'all' to read from all calendars.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "commands": {
+            "type": "array",
+            "description": "Array with ONE command object.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "read_or_write": {
+                  "type": "string",
+                  "enum": ["read", "create_event"],
+                  "description": "'read' to view events, 'create_event' to add an event."
+                },
+                "calendar": {
+                  "type": "string",
+                  "description": "'all' for reading all calendars, or specific calendar like 'morgan_personal'."
+                },
+                "read_type": {
+                  "type": "string",
+                  "enum": ["next_events", "day_summary", "week_summary", "specific_date"],
+                  "description": "What to fetch for read operations."
+                },
+                "limit": {
+                  "type": "integer",
+                  "description": "Max events to return (default: 10)."
+                },
+                "date": {
+                  "type": "string",
+                  "description": "Date in YYYY-MM-DD or natural language like 'tomorrow'."
+                },
+                "event_title": {
+                  "type": "string",
+                  "description": "For create_event: the event title."
+                },
+                "event_description": {
+                  "type": "string",
+                  "description": "For create_event: optional event details/notes."
+                },
+                "start_time": {
+                  "type": "string",
+                  "description": "For create_event: start time like '14:00' or '2pm'."
+                },
+                "end_time": {
+                  "type": "string",
+                  "description": "For create_event: end time."
+                },
+                "location": {
+                  "type": "string",
+                  "description": "Optional event location."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "stickies",
+      "description": "Read and edit the user's desktop sticky note (macOS Stickies app). For notes, to-do lists, things written down.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["read", "write"],
+            "description": "'read' returns note content; 'write' applies edits."
+          },
+          "section": {
+            "type": "string",
+            "enum": ["notes", "todo", "both"],
+            "description": "For read: which section to return."
+          },
+          "edits": {
+            "type": "array",
+            "description": "For write: array of edit operations.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "op": {
+                  "type": "string",
+                  "enum": ["add_todo", "remove_todo", "edit_todo", "add_note", "remove_note", "edit_note"],
+                  "description": "The edit operation to perform."
+                },
+                "item": {
+                  "type": "string",
+                  "description": "For add_todo: the task text."
+                },
+                "due": {
+                  "type": "string",
+                  "description": "For add_todo: optional due date (e.g., 'Feb 12', 'Monday')."
+                },
+                "match": {
+                  "type": "string",
+                  "description": "For remove operations: text to match."
+                },
+                "old": {
+                  "type": "string",
+                  "description": "For edit operations: existing text to find."
+                },
+                "new": {
+                  "type": "string",
+                  "description": "For edit operations: replacement text."
+                },
+                "subheading": {
+                  "type": "string",
+                  "description": "For add_note: the note subheading."
+                },
+                "content": {
+                  "type": "string",
+                  "description": "For add_note: the note content."
+                }
+              },
+              "required": ["op"]
+            }
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "send_sms",
+      "description": "Send a text message (iMessage) to the user's phone. For reminders or notifications to mobile device.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The text message to send."
+          }
+        },
+        "required": ["message"]
+      }
+    },
+    {
+      "name": "google_search",
+      "description": "Search the web for up-to-date information. Only call ONCE per request.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query. Be specific for better results."
+          },
+          "query_type": {
+            "type": "string",
+            "enum": ["general", "link", "directions"],
+            "description": "'general' for info, 'link' for URLs, 'directions' for navigation."
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "read_clipboard",
+      "description": "Read the current contents of the user's system clipboard.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "max_length": {
+            "type": "integer",
+            "description": "Max characters to return (default: 8000)."
+          }
+        }
+      }
+    },
+    {
+      "name": "briefing",
+      "description": "Create and manage briefing announcements spoken to users when they wake up the assistant.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["create", "list", "dismiss"],
+            "description": "'create' new briefing, 'list' pending, 'dismiss' cancel."
+          },
+          "message": {
+            "type": "string",
+            "description": "For create: the briefing message."
+          },
+          "remind_at": {
+            "type": "string",
+            "description": "Absolute reminder time in ISO format or natural language like '9am', 'tomorrow 3pm'."
+          },
+          "remind_before_minutes": {
+            "type": "integer",
+            "description": "Minutes before event_time to remind."
+          },
+          "event_time": {
+            "type": "string",
+            "description": "When the actual event is (for relative reminders)."
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "normal", "low"],
+            "description": "Priority level. Default: 'normal'."
+          },
+          "briefing_id": {
+            "type": "string",
+            "description": "For dismiss: the briefing ID."
+          }
+        },
+        "required": ["action"]
+      }
+    },
+    {
+      "name": "get_notifications",
+      "description": "Check for pending notifications like email summaries and news.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "type_filter": {
+            "type": "string",
+            "enum": ["email", "news", "other", "all"],
+            "description": "'email' for email summaries, 'news' for news, 'all' for everything."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max notifications to return."
+          },
+          "priority_filter": {
+            "type": "string",
+            "enum": ["high", "normal", "low", "all"],
+            "description": "Filter by priority. Default: 'all'."
+          }
+        }
+      }
+    },
+    {
+      "name": "system_info",
+      "description": "Get information about how this voice assistant works internally.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "enum": ["overview", "architecture", "providers", "orchestrator", "audio", "tools", "memory", "config", "all"],
+            "description": "Specific documentation section."
+          }
+        }
+      }
+    },
+    {
+      "name": "cursor_composer",
+      "description": "Send a coding request to Cursor's Composer for multi-file edits. Use when the user wants to write, refactor, or modify code in their codebase. The prompt will be pasted into Cursor's Composer interface for review. Only works on macOS.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The coding task to send to Cursor Composer. Be specific about what files, functions, or changes are needed. This will be pasted into Cursor's Composer for review before execution."
+          }
+        },
+        "required": ["prompt"]
+      }
+    }
+  ]
+}

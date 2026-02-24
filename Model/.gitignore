@@ -1,0 +1,29 @@
+# Environment
+.env
+
+# Google OAuth credentials and tokens
+creds/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Model artifacts (large binary files)
+model_qwen4_finetuning/output/merged_model/
+model_qwen4_finetuning/output/gguf/*.gguf
+model_qwen4_finetuning/output/lora_adapter/checkpoint-*/
+
+# llama.cpp build (vendored dependency)
+model_qwen4_finetuning/llama.cpp/
+
+# HuggingFace cache
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

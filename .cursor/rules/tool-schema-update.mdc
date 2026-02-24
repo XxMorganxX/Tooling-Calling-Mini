@@ -1,0 +1,53 @@
+---
+description: Process for updating tool schemas, regenerating the OpenClaw spec, and execution patterns from the HomeAssist MCP server
+globs: Model/model_qwen4_finetuning/**
+alwaysApply: false
+---
+
+# Updating Tool Schemas from HomeAssist
+
+The source of truth for tool definitions lives in the HomeAssist repo, imported as a git submodule at `Model/homeassist-ref/`.
+
+## Submodule Location
+
+- **Submodule path**: `Model/homeassist-ref/`
+- **Tool source code**: `Model/homeassist-ref/mcp_server/tools/`
+- **Tool base class**: `Model/homeassist-ref/mcp_server/base_tool.py`
+- **Enabled/disabled config**: `Model/homeassist-ref/mcp_server/tools_config.py`
+- **Remote**: `https://github.com/XxMorganxX/homeassist.git` (branch: `main`)
+
+## Pulling Updates
+
+To get the latest tool changes from HomeAssist:
+
+```bash
+cd Model/homeassist-ref && git pull origin main && cd ../..
+```
+
+## How Tools Are Structured
+
+Each tool in `mcp_server/tools/` is a Python class extending `BaseTool` with:
+- `name` — tool name string (e.g., `"weather"`)
+- `description` — what the tool does
+- `get_schema()` — returns a JSON schema dict defining parameters
+- `execute(params)` — runs the tool and returns a result dict
+
+## Updating `tool_calling_config.json`
+
+When a tool's schema changes upstream, update `Model/model_qwen4_finetuning/tool_calling_config.json` to match. For each tool:
+1. Read the `get_schema()` return value from the tool's source file
+2. Copy the `name` and `description` class attributes
+3. Update the corresponding entry in `tool_calling_config.json` under `"tools"`
+
+Check `tools_config.py` `ENABLED_TOOLS` to know which tools are active.
+
+## What Needs Updating When Tools Change
+
+1. **`tool_calling_config.json`** — tool schemas used by inference and training
+2. **`data/training_data.jsonl`** — may need new examples for changed/added tools
+3. **`server.py`** — no changes needed (loads schemas dynamically from config)
+4. **`OPENCLAW_API.md`** — external integration spec consumed by OpenClaw. Regenerate with:
+   ```bash
+   python scripts/generate_openclaw_spec.py
+   ```
+   The git pre-commit hook handles this automatically when `tool_calling_config.json` is staged, but run it manually if you want to preview the output before committing.

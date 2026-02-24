@@ -1,0 +1,3 @@
+[submodule "Model/homeassist-ref"]
+	path = Model/homeassist-ref
+	url = https://github.com/XxMorganxX/homeassist.git

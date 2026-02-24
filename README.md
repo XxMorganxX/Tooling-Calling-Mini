@@ -4,8 +4,9 @@ A two-part system for fine-tuning, hosting, and interacting with a Qwen3-4B mode
 
 ```
 Tool Calling Mini/
-├── Tool-Mini-Model/            ← Server: training pipeline + inference API
-└── Tool-Mini-Model-Client/     ← Client: interactive terminal chat
+├── Model/                ← Server: training pipeline + inference API
+├── Client-CLI/           ← Client: interactive terminal chat
+└── Client-Web/           ← Client: web-based chat interface
 ```
 
 ---
@@ -14,13 +15,13 @@ Tool Calling Mini/
 
 ```
 ┌──────────────────────────┐
-│    Tool-Mini-Model-Client │  Python terminal REPL
+│    Client-CLI             │  Python terminal REPL
 │    (main.py)              │  Rich UI, conversation history
 └────────┬─────────────────┘
          │  HTTP + X-API-Key
          ▼
 ┌──────────────────────────┐
-│    Tool-Mini-Model        │  FastAPI gateway (:8000)
+│    Model                  │  FastAPI gateway (:8000)
 │    (server.py)            │  Auth, prompt building, response parsing
 └────────┬─────────────────┘
          │  localhost HTTP
@@ -33,7 +34,7 @@ Tool Calling Mini/
 
 ---
 
-## Server — `Tool-Mini-Model/`
+## Server — `Model/`
 
 ### What It Does
 
@@ -45,7 +46,7 @@ Tool Calling Mini/
 ### Structure
 
 ```
-Tool-Mini-Model/
+Model/
 ├── server.py                       # FastAPI inference server (entry point)
 ├── .env                            # INFERENCE_REFRESH_TOKEN
 ├── inference/
@@ -79,7 +80,7 @@ Tool-Mini-Model/
 ### Running the Server
 
 ```bash
-cd Tool-Mini-Model
+cd Model
 
 # Set the refresh token
 # .env: INFERENCE_REFRESH_TOKEN="your-secret"
@@ -95,7 +96,7 @@ python server.py
 ### Training Pipeline
 
 ```bash
-cd Tool-Mini-Model/model_qwen4_finetuning
+cd Model/model_qwen4_finetuning
 
 pip install -r requirements.txt
 
@@ -117,7 +118,7 @@ python run.py --stop export       # Stop before validation
 
 ---
 
-## Client — `Tool-Mini-Model-Client/`
+## Client — `Client-CLI/`
 
 ### What It Does
 
@@ -129,7 +130,7 @@ python run.py --stop export       # Stop before validation
 ### Structure
 
 ```
-Tool-Mini-Model-Client/
+Client-CLI/
 ├── main.py                 # Interactive terminal REPL (entry point)
 ├── config.yaml             # Server URL, generation params, conversation settings
 ├── .env                    # INFERENCE_REFRESH_TOKEN
@@ -145,7 +146,7 @@ Tool-Mini-Model-Client/
 ### Running the Client
 
 ```bash
-cd Tool-Mini-Model-Client
+cd Client-CLI
 
 pip install -r requirements.txt
 
@@ -225,11 +226,11 @@ Both the server and client share a permanent **refresh token** (`INFERENCE_REFRE
 
 ## Configuration
 
-### Server (`Tool-Mini-Model/model_qwen4_finetuning/config.yaml`)
+### Server (`Model/model_qwen4_finetuning/config.yaml`)
 
 Central config for model selection, LoRA parameters, training hyperparameters, export settings, and inference/generation defaults. All paths are relative to this file.
 
-### Client (`Tool-Mini-Model-Client/config.yaml`)
+### Client (`Client-CLI/config.yaml`)
 
 ```yaml
 server:

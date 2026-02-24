@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Git pre-commit hook — regenerates OPENCLAW_API.md when tool_calling_config.json
+# is part of the staged changeset. Installed via scripts/install-hooks.sh.
+
+TOOL_CONFIG="Model/model_qwen4_finetuning/tool_calling_config.json"
+GENERATOR="scripts/generate_openclaw_spec.py"
+OUTPUT="OPENCLAW_API.md"
+
+if git diff --cached --name-only | grep -q "^${TOOL_CONFIG}$"; then
+    echo "[pre-commit] tool_calling_config.json changed — regenerating ${OUTPUT}..."
+
+    if ! python "$GENERATOR"; then
+        echo "[pre-commit] ERROR: ${GENERATOR} failed. Commit aborted."
+        echo "[pre-commit] Fix the issue and try again."
+        exit 1
+    fi
+
+    git add "$OUTPUT"
+    echo "[pre-commit] ${OUTPUT} regenerated and staged."
+fi

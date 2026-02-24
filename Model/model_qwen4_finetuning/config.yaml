@@ -1,0 +1,219 @@
+# =============================================================================
+# Qwen3 Tool-Calling Fine-Tune Configuration
+# =============================================================================
+# Single source of truth for all training parameters.
+# All paths are relative to the project root (where this config lives).
+# Sub-projects (data/, training/, inference/) resolve these paths
+# relative to this file's location via their resolve_path() helper.
+
+# -----------------------------------------------------------------------------
+# Model Registry
+# -----------------------------------------------------------------------------
+# Named model profiles. Switch the active model by changing `active_model`.
+# Each profile specifies where its GGUF lives and training-related metadata.
+active_model: "qwen3-8b"
+
+models:
+  qwen3-4b:
+    display_name: "Qwen3-4B Tool-Calling"
+    model_name: "Qwen/Qwen3-4B-Instruct-2507"
+    gguf_path: "output/gguf/Qwen_Qwen3-4B-Instruct-2507-tool-calling-q4_k_m.gguf"
+    max_seq_length: 4096
+    load_in_4bit: true
+    dtype: null
+
+  qwen3-8b:
+    display_name: "Qwen3-8B Tool-Calling"
+    model_name: "Qwen/Qwen3-8B"
+    gguf_path: "../Qwen_Qwen3-8B-tool-calling-q4_0.gguf"
+    max_seq_length: 4096
+    load_in_4bit: true
+    dtype: null
+
+# Legacy `model` section used by the training pipeline.
+# Inference reads from models[active_model] instead.
+model:
+  model_name: "Qwen/Qwen3-8B"
+  max_seq_length: 4096
+  load_in_4bit: true
+  dtype: null
+
+# -----------------------------------------------------------------------------
+# LoRA — targeting ~2% trainable parameters
+# -----------------------------------------------------------------------------
+lora:
+  # Rank: controls adapter capacity. 24 on 4B ≈ 2% trainable params.
+  r: 24
+
+  # Alpha: scaling factor. Convention: alpha = 2 * r
+  lora_alpha: 48
+
+  # Dropout on LoRA layers (0 = enables Unsloth fast patching)
+  lora_dropout: 0
+
+  # Projection layers to adapt
+  # Attention: q/k/v/o  |  MLP: gate/up/down
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+  # No bias adaptation (standard for QLoRA)
+  bias: "none"
+
+  # Rank-stabilized LoRA: scales alpha by 1/sqrt(r) for stable training at higher ranks
+  use_rslora: true
+
+# -----------------------------------------------------------------------------
+# Training
+# -----------------------------------------------------------------------------
+training:
+  # Optimizer: adamw_8bit for memory-efficient QLoRA on 24GB VRAM
+  # Use "adamw_torch" for full-precision training (e.g., 1.7B model)
+  optimizer: "adamw_8bit"
+
+  # Learning rate (QLoRA sweet spot for 4B models)
+  learning_rate: 2.0e-4
+
+  # Cosine decay to near-zero by final epoch
+  lr_scheduler_type: "cosine"
+
+  # Warmup: 5% of total steps
+  warmup_ratio: 0.05
+
+  # Epochs: small dataset (~498 examples) needs multiple passes
+  num_train_epochs: 5
+
+  # Batch size per GPU (limited by 16GB VRAM with 4-bit model + LoRA)
+  per_device_train_batch_size: 2
+
+  # Eval batch size: smaller to avoid OOM during FP32 metric conversion
+  per_device_eval_batch_size: 1
+
+  # Gradient accumulation: effective batch = 2 * 8 = 16
+  gradient_accumulation_steps: 8
+
+  # Gradient clipping for stability
+  max_grad_norm: 1.0
+
+  # Weight decay (regularization)
+  weight_decay: 0.01
+
+  # Mixed precision: auto-selected based on GPU
+  # RTX 2070-era (Turing) -> fp16 | RTX 30xx+ (Ampere) -> bf16
+  fp16: false
+  bf16: false
+  auto_detect_precision: true
+
+  # Reproducibility
+  seed: 42
+
+  # Logging frequency (in steps)
+  logging_steps: 5
+
+  # Save checkpoints every epoch
+  save_strategy: "epoch"
+
+  # Train/eval split ratio
+  eval_split_ratio: 0.05
+
+  # Max number of checkpoints to keep on disk
+  save_total_limit: 3
+
+# -----------------------------------------------------------------------------
+# Data
+# -----------------------------------------------------------------------------
+data:
+  # Raw training data (in the data/ sub-project)
+  training_data_path: "data/training_data.jsonl"
+
+  # Tool schema definitions (shared interface at project root)
+  tool_config_path: "tool_calling_config.json"
+
+  # Where prepare_dataset.py caches the processed dataset
+  processed_dataset_path: "data/output/processed_dataset"
+
+  # System prompt for training (injected as system message)
+  # Tool schemas are injected separately via apply_chat_template(tools=...)
+  # so this prompt should NOT contain tool definitions
+  system_prompt: >-
+    You are a tool-calling assistant. Analyze user requests and determine
+    the correct tool call(s) to fulfill them. It is very unlikely, but if no tool is needed, respond
+    normally without tool calls.
+
+  # Only compute loss on assistant response tokens
+  train_on_completions_only: true
+
+# -----------------------------------------------------------------------------
+# Export (LoRA merge + GGUF conversion)
+# -----------------------------------------------------------------------------
+export:
+  # GGUF quantization type (q4_k_m = good quality/size balance)
+  # Options: q4_0, q4_k_m, q5_k_m, q8_0, f16
+  gguf_quant_type: "q4_k_m"
+
+  # Path to llama.cpp installation (for llama-quantize, convert scripts)
+  llamacpp_path: "/opt/homebrew/bin"
+
+  # Output directories
+  output_dir: "output"
+  lora_adapter_dir: "output/lora_adapter"
+  merged_model_dir: "output/merged_model"
+  gguf_output_dir: "output/gguf"
+
+# -----------------------------------------------------------------------------
+# Inference (llama-server + sampling parameters)
+# -----------------------------------------------------------------------------
+inference:
+  # ── Server settings ──────────────────────────────────────────────────
+  # Full GPU offload (-1 = all layers on GPU, 0 = CPU only)
+  gpu_layers: -1
+
+  # Flash attention for faster inference
+  flash_attn: true
+
+  # Context size (must match training max_seq_length)
+  n_ctx: 4096
+
+  # llama-server endpoint
+  server_host: "127.0.0.1"
+  server_port: 8080
+
+  # ── Generation parameters ────────────────────────────────────────────
+  # Max tokens to generate per response
+  max_tokens: 512
+
+  # Temperature: 0.0 = greedy/deterministic, higher = more creative
+  # Qwen3 recommended: 0.6 for thinking mode, 0.7 for non-thinking
+  temperature: 0.6
+
+  # Top-p (nucleus sampling): cumulative probability cutoff
+  top_p: 0.95
+
+  # Top-k: limit sampling to top k tokens (0 = disabled)
+  top_k: 20
+
+  # Min-p: minimum probability threshold relative to top token (0.0 = disabled)
+  min_p: 0.0
+
+  # Repetition penalty: penalize repeated tokens (1.0 = disabled)
+  repeat_penalty: 1.0
+
+  # Enable thinking/reasoning (<think> tags) in responses
+  # Disable for tool-calling fine-tunes trained without thinking data
+  enable_thinking: True
+
+# -----------------------------------------------------------------------------
+# Agent (tool execution settings)
+# -----------------------------------------------------------------------------
+agent:
+  # Execute tools server-side after model produces tool calls
+  execute_tools: true
+
+  # Per-tool execution timeout in seconds
+  tool_timeout: 30.0
+
