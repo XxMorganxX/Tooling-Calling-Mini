@@ -166,13 +166,13 @@ def generate():
 
     | Item | Value |
     |---|---|
-    | Base URL | `http://<server-ip>:8000` |
+    | Base URL | `https://inference.stuart-labs.com` |
     | Chat endpoint | `POST /v1/chat/completions` |
     | Stream endpoint | `POST /v1/chat/completions/stream` |
     | Health check | `GET /health` (no auth) |
-    | Interactive docs | `http://<server-ip>:8000/docs` (Swagger UI) |
+    | Interactive docs | `https://inference.stuart-labs.com/docs` (Swagger UI) |
 
-    Replace `<server-ip>` with the actual host IP or domain where the server is running.
+    Served via Cloudflare Tunnel. The server listens on `localhost:8000` internally.
 
     ---
 
@@ -350,7 +350,7 @@ def generate():
     import requests
     from datetime import datetime, timezone
 
-    BASE_URL = "http://<server-ip>:8000"
+    BASE_URL = "https://inference.stuart-labs.com"
     REFRESH_TOKEN = "<your-refresh-token>"
 
     api_key = None

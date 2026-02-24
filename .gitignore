@@ -1,5 +1,11 @@
-# ─── Secrets ──────────────────────────────────────────────────────────────────
+# ─── Secrets & credentials ────────────────────────────────────────────────────
 .env
+creds/
+*.pem
+*.key
+*.p12
+**/service*.json
+!package*.json
 
 # ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
@@ -19,16 +25,16 @@ venv/
 #   - output/merged_model/   (multi-GB merged weights)
 #   - output/gguf/           (quantized GGUF + conversion artifacts)
 #   - output/lora_adapter/   (adapter weights, tokenizer copies, checkpoints)
-Tool-Mini-Model/model_qwen4_finetuning/output/
+Model/model_qwen4_finetuning/output/
 
 # Processed/tokenized dataset cache
-Tool-Mini-Model/model_qwen4_finetuning/data/output/
+Model/model_qwen4_finetuning/data/output/
 
 # ─── Unsloth compiled cache (auto-generated trainer code) ────────────────────
-Tool-Mini-Model/model_qwen4_finetuning/unsloth_compiled_cache/
+**/unsloth_compiled_cache/
 
 # ─── llama.cpp (vendored C++ dependency, large) ──────────────────────────────
-Tool-Mini-Model/model_qwen4_finetuning/llama.cpp/
+Model/model_qwen4_finetuning/llama.cpp/
 
 # ─── HuggingFace / model cache ───────────────────────────────────────────────
 .cache/
@@ -39,6 +45,9 @@ Tool-Mini-Model/model_qwen4_finetuning/llama.cpp/
 *.gguf
 *.bin
 !requirements*.txt
+
+# ─── Per-user config (loaded from gitignored files) ──────────────────────────
+Model/inference/calendar_users.json
 
 # ─── Node / frontend ─────────────────────────────────────────────────────────
 node_modules/

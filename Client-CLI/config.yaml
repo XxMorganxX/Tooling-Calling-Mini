@@ -1,5 +1,5 @@
 server:
-  url: "http://192.168.1.75:8000"
+  url: "http://localhost:8000"
   timeout: 120                    # seconds to wait for a response
 
 model:

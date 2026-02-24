@@ -13,7 +13,7 @@ Reports three accuracy tiers:
 Usage:
     python run.py                                    # defaults: 25 samples, localhost:8080
     python run.py --samples 50                       # more samples
-    python run.py --host 192.168.1.75 --port 8080    # custom server
+    python run.py --host 10.0.0.50 --port 8080       # custom server
     python run.py --seed 42                          # reproducible run
     python run.py --verbose                          # show thinking + raw output
 """

@@ -1,0 +1,17 @@
+{
+    "personal": {
+        "calendar_id": "you@gmail.com",
+        "display_name": "Personal",
+        "aliases": ["personal", "main", "gmail", "my calendar"]
+    },
+    "school": {
+        "calendar_id": "you@university.edu",
+        "display_name": "School",
+        "aliases": ["school", "university", "class", "classes"]
+    },
+    "project": {
+        "calendar_id": "long_hash@group.calendar.google.com",
+        "display_name": "Project",
+        "aliases": ["project", "reminders"]
+    }
+}

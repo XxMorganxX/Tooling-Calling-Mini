@@ -1,7 +1,7 @@
 # Tool-Calling Mini — External Integration Spec
 
 > **Auto-generated** from [`tool_calling_config.json`](https://raw.githubusercontent.com/XxMorganxX/Tooling-Calling-Mini/master/Model/model_qwen4_finetuning/tool_calling_config.json)
-> on 2026-02-24T00:45:43Z. Do not edit by hand — run `python scripts/generate_openclaw_spec.py` to regenerate.
+> on 2026-02-24T02:03:32Z. Do not edit by hand — run `python scripts/generate_openclaw_spec.py` to regenerate.
 
 This document gives an external agent everything it needs to delegate tool calls
 to the Tool-Calling Mini inference API.
@@ -12,13 +12,13 @@ to the Tool-Calling Mini inference API.
 
 | Item | Value |
 |---|---|
-| Base URL | `http://<server-ip>:8000` |
+| Base URL | `https://inference.stuart-labs.com` |
 | Chat endpoint | `POST /v1/chat/completions` |
 | Stream endpoint | `POST /v1/chat/completions/stream` |
 | Health check | `GET /health` (no auth) |
-| Interactive docs | `http://<server-ip>:8000/docs` (Swagger UI) |
+| Interactive docs | `https://inference.stuart-labs.com/docs` (Swagger UI) |
 
-Replace `<server-ip>` with the actual host IP or domain where the server is running.
+Served via Cloudflare Tunnel. The server listens on `localhost:8000` internally.
 
 ---
 
@@ -202,7 +202,7 @@ Synthesize final response for the user
 import requests
 from datetime import datetime, timezone
 
-BASE_URL = "http://<server-ip>:8000"
+BASE_URL = "https://inference.stuart-labs.com"
 REFRESH_TOKEN = "<your-refresh-token>"
 
 api_key = None
@@ -461,4 +461,4 @@ https://raw.githubusercontent.com/XxMorganxX/Tooling-Calling-Mini/master/Model/m
 
 ---
 
-*Generated 2026-02-24T00:45:43Z — 12 tools registered*
+*Generated 2026-02-24T02:03:32Z — 12 tools registered*
