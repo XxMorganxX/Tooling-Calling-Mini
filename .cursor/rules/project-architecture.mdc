@@ -1,0 +1,80 @@
+---
+description: Project architecture overview — component map, key files, and how subsystems interact. Read this first when working anywhere in the codebase.
+globs: 
+alwaysApply: true
+---
+
+# Project Architecture
+
+Tool-Calling-Mini is a system for fine-tuning, serving, and interacting with a Qwen3 model specialized in tool calling. It consists of a training pipeline, an inference server, a tool execution engine, and two client interfaces.
+
+## Component Map
+
+```
+Tool-Calling-Mini/
+├── Model/                          Server: inference API + training pipeline + tools
+│   ├── server.py                   FastAPI inference server (primary entry point)
+│   ├── agent.py                    Multi-turn tool-call agent loop
+│   ├── context.py                  Server-side token-aware context manager
+│   ├── inference/                  Core inference, GGUF export, validation
+│   ├── model_qwen4_finetuning/     Training pipeline, config.yaml, tool schemas
+│   │   ├── config.yaml             SINGLE SOURCE OF TRUTH for all configuration
+│   │   ├── tool_calling_config.json  12 tool schemas (synced from homeassist-ref)
+│   │   ├── data/                   Dataset preparation + training_data.jsonl
+│   │   └── training/               QLoRA fine-tuning script
+│   ├── tools/                      Tool implementations + validation + executor
+│   ├── clients/                    External API clients used by tools
+│   ├── tool_calling_sdk/           Shared SDK for conversation context management
+│   └── homeassist-ref/             Git submodule — source of truth for tool definitions
+├── Client-CLI/                     Terminal chat REPL with Rich UI
+├── Client-Web/                     Web chat interface (React + FastAPI proxy)
+│   ├── backend/                    FastAPI proxy with session management
+│   └── frontend/                   React + TypeScript + Vite
+├── Inference-Test-Suite/           Statistical accuracy validation against training data
+├── scripts/                        Maintenance scripts (integration spec gen, git hooks)
+├── INTEGRATION_API.md              Auto-generated external integration spec
+└── README.md                       Project documentation
+```
+
+## Data Flow
+
+```
+User → Client (CLI or Web) → FastAPI server.py (:8000) → llama-server (:8080) → GPU inference
+                                    ↓ tool_calls?
+                              ToolExecutor → tool implementations → clients/ → External APIs
+                                    ↓ tool results
+                              Re-prompt model → final text response → Client
+```
+
+## Key Files to Know
+
+| File | Why It Matters |
+|------|---------------|
+| `Model/model_qwen4_finetuning/config.yaml` | Central config for everything: models, LoRA, training, export, inference, agent |
+| `Model/model_qwen4_finetuning/tool_calling_config.json` | Canonical tool schemas — used by training, inference, and INTEGRATION_API.md |
+| `Model/server.py` | FastAPI server entry point — auth, endpoints, tool execution orchestration |
+| `Model/agent.py` | Agent loop that drives multi-turn tool-call → result → re-prompt cycles |
+| `Model/tools/models.py` | Pydantic validation models for all 12 tools with synonym normalization |
+| `Model/tools/executor.py` | `ToolExecutor` — dispatches validated tool calls with timeout handling |
+| `Model/inference/inference.py` | Prompt building, tool-call parsing, llama-server management |
+
+## Authentication
+
+All clients authenticate with the inference server using HMAC-SHA256 rotating API keys derived from `INFERENCE_REFRESH_TOKEN` (stored in `.env` files). Keys rotate every 5 minutes.
+
+## Each Subfolder Has a README
+
+Every important directory contains a README.md explaining its purpose, files, usage, and relationships. When working in a new area, read its README first:
+
+- `Model/README.md` — Server component overview
+- `Model/inference/README.md` — Inference, export, validation
+- `Model/model_qwen4_finetuning/README.md` — Training pipeline
+- `Model/model_qwen4_finetuning/data/README.md` — Dataset preparation
+- `Model/model_qwen4_finetuning/training/README.md` — QLoRA training
+- `Model/tools/README.md` — Tool implementations and validation
+- `Model/clients/README.md` — External API clients
+- `Model/tool_calling_sdk/README.md` — Shared conversation SDK
+- `Client-CLI/README.md` — Terminal client
+- `Client-Web/README.md` — Web client
+- `Inference-Test-Suite/README.md` — Test suite
+- `scripts/README.md` — Maintenance scripts

@@ -13,8 +13,8 @@ from tools.models import SystemInfoArgs
 
 logger = logging.getLogger(__name__)
 
-# inference/tools/ -> inference/ -> Model/
-_project_root = Path(__file__).parent.parent.parent
+# tools/ -> Model/
+_project_root = Path(__file__).parent.parent
 _dev_readme_path = _project_root / "homeassist-ref" / "DEV_README.md"
 
 SECTION_HEADERS: Dict[str, List[str]] = {

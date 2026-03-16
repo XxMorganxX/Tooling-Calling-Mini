@@ -65,8 +65,13 @@ class ToolExecutor:
     def register(self, name: str, fn: Callable) -> None:
         self._handlers[name] = fn
 
-    def register_all_tools(self) -> None:
-        """Auto-import and register all 12 tool modules."""
+    def register_all_tools(self, tools: list[str] | None = None) -> None:
+        """Auto-import and register tool modules.
+
+        Args:
+            tools: Optional list of tool names to register. When provided, only
+                   those tools are imported. When None, all tools are registered.
+        """
         tool_modules = {
             "weather": "tools.weather",
             "spotify_playback": "tools.spotify",
@@ -82,7 +87,11 @@ class ToolExecutor:
             "cursor_composer": "tools.cursor",
         }
 
+        subset = set(tools) if tools is not None else set(tool_modules)
+
         for tool_name, module_path in tool_modules.items():
+            if tool_name not in subset:
+                continue
             try:
                 import importlib
 
@@ -96,7 +105,7 @@ class ToolExecutor:
             except Exception as e:
                 logger.warning("Failed to import tool %s (%s): %s", tool_name, module_path, e)
 
-        logger.info("Registered %d/%d tools", len(self._handlers), len(tool_modules))
+        logger.info("Registered %d/%d tools", len(self._handlers), len(subset))
 
     async def execute(self, call: ValidatedToolCall) -> ToolResult:
         """Execute a single validated tool call with timeout."""

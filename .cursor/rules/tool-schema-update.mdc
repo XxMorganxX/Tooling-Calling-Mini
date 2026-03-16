@@ -46,7 +46,7 @@ Check `tools_config.py` `ENABLED_TOOLS` to know which tools are active.
 1. **`tool_calling_config.json`** — tool schemas used by inference and training
 2. **`data/training_data.jsonl`** — may need new examples for changed/added tools
 3. **`server.py`** — no changes needed (loads schemas dynamically from config)
-4. **`OPENCLAW_API.md`** — external integration spec consumed by OpenClaw. Regenerate with:
+4. **`INTEGRATION_API.md`** — external integration spec. Regenerate with:
    ```bash
    python scripts/generate_openclaw_spec.py
    ```

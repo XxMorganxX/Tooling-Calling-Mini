@@ -1,0 +1,67 @@
+---
+description: Maintain AGENTS.md files in important directories to document component purpose, interface, and conventions for AI agents navigating the codebase
+alwaysApply: true
+---
+
+# AGENTS.md Convention
+
+Every significant component directory should contain an `AGENTS.md` file that helps AI agents (and humans) quickly understand what the component does, how to interact with it, and what not to break.
+
+## When to Create or Update
+
+- **Create** an `AGENTS.md` when adding a new top-level directory, module, package, or self-contained subsystem.
+- **Update** the relevant `AGENTS.md` when you change a component's public interface, add/remove entry points, change key file roles, or alter conventions that would affect someone working in that directory.
+- Do not create `AGENTS.md` for trivial folders (e.g. `__pycache__`, `node_modules`, `dist`, build output).
+
+## Where to Place
+
+Place `AGENTS.md` at the root of each important directory. Good candidates:
+
+- Top-level project root (already covered by `README.md` — only add `AGENTS.md` if agent-specific guidance differs from the README)
+- Each major subsystem directory (e.g. `Model/`, `Client-CLI/`, `Client-Web/`)
+- Nested modules with distinct responsibilities (e.g. `Model/inference/`, `Model/model_qwen4_finetuning/`)
+- Shared libraries or SDKs (e.g. `Model/tool_calling_sdk/`)
+
+## Required Sections
+
+Every `AGENTS.md` must include these sections in order:
+
+```markdown
+# <Component Name>
+
+## Purpose
+What this component does and why it exists. 1-3 sentences.
+
+## Key Files
+| File | Role |
+|------|------|
+| `entry.py` | Main entry point |
+| `config.yaml` | Configuration — do not change structure without updating dependents |
+
+## Interface
+How other components or agents interact with this one:
+- Entry points (CLI commands, API endpoints, importable modules)
+- Expected inputs and outputs
+- Environment variables or config files required
+
+## Conventions
+Local rules that apply inside this directory:
+- Naming patterns, code style deviations, or architectural constraints
+- Which files are generated vs hand-authored
+- Test expectations (where tests live, how to run them)
+
+## Gotchas
+Non-obvious things that could cause confusion or breakage:
+- Implicit dependencies, ordering requirements, or shared state
+- Files that look editable but are auto-generated
+- Anything that has bitten someone before
+```
+
+## Style Guidelines
+
+- Write for an agent arriving with zero context about this directory.
+- Be concrete: name files, commands, and environment variables explicitly.
+- Keep each `AGENTS.md` under 80 lines — link to detailed docs rather than duplicating them.
+- Use tables for file inventories; use bullet lists for conventions and gotchas.
+- Do not duplicate the project-level README; focus on what is specific to this component.
+- Omit sections that genuinely don't apply (e.g. `Gotchas` if there are none), but keep the ordering of the remaining sections consistent.

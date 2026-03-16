@@ -1,10 +1,12 @@
 """
-Shared SDK for building tool-calling conversation context.
+Shared SDK for tool-calling clients.
 
-Any client (web frontend, CLI, API consumer) imports ContextManager
-to manage messages, track token budget, and build API request payloads.
+Provides:
+- ContextManager  -- stateful conversation builder and token budget tracker
+- LocalToolExecutor -- executes client-side tools locally using Model/tools/
 """
 
 from tool_calling_sdk.context import ContextManager
+from tool_calling_sdk.executor import LocalToolExecutor
 
-__all__ = ["ContextManager"]
+__all__ = ["ContextManager", "LocalToolExecutor"]

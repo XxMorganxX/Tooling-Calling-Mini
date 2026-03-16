@@ -1,12 +1,15 @@
 # Tool Calling Mini
 
-A two-part system for fine-tuning, hosting, and interacting with a Qwen3-4B model specialized in tool calling. The **server** handles model training, GGUF export, and authenticated inference via llama.cpp. The **client** provides a terminal chat interface with conversation management and Rich-formatted output.
+A system for fine-tuning, serving, and interacting with Qwen3 models specialized in tool calling. The **server** handles model training, GGUF export, authenticated inference via llama.cpp, and server-side tool execution. Two **clients** provide terminal and web chat interfaces. A **test suite** validates tool-calling accuracy against training data.
 
 ```
-Tool Calling Mini/
-├── Model/                ← Server: training pipeline + inference API
-├── Client-CLI/           ← Client: interactive terminal chat
-└── Client-Web/           ← Client: web-based chat interface
+Tool-Calling-Mini/
+├── Model/                    ← Server: inference API + tool execution + training pipeline
+├── Client-CLI/               ← Client: interactive terminal chat
+├── Client-Web/               ← Client: web-based chat interface
+├── Inference-Test-Suite/     ← Statistical accuracy validation
+├── scripts/                  ← Maintenance scripts (spec generation, git hooks)
+└── homeassist-ref/           ← Git submodule: source of truth for tool definitions
 ```
 
 ---
@@ -14,20 +17,23 @@ Tool Calling Mini/
 ## Architecture
 
 ```
-┌──────────────────────────┐
-│    Client-CLI             │  Python terminal REPL
-│    (main.py)              │  Rich UI, conversation history
-└────────┬─────────────────┘
-         │  HTTP + X-API-Key
-         ▼
-┌──────────────────────────┐
-│    Model                  │  FastAPI gateway (:8000)
-│    (server.py)            │  Auth, prompt building, response parsing
-└────────┬─────────────────┘
+┌──────────────────────────┐  ┌──────────────────────────┐
+│    Client-CLI             │  │    Client-Web             │
+│    (main.py)              │  │    React (:5173)          │
+│    Rich terminal REPL     │  │    FastAPI proxy (:8001)  │
+└────────┬─────────────────┘  └────────┬─────────────────┘
+         │  HTTP + X-API-Key           │  HTTP + cookies
+         └──────────┬──────────────────┘
+                    ▼
+┌──────────────────────────────────────────────────────┐
+│    Model/server.py          FastAPI gateway (:8000)   │
+│    Auth, prompt building, response parsing            │
+│    Server-side tool execution (agent loop)            │
+└────────┬─────────────────────────────────────────────┘
          │  localhost HTTP
          ▼
 ┌──────────────────────────┐
-│    llama-server           │  llama.cpp inference engine (:8080)
+│    llama-server           │  llama.cpp inference (:8080)
 │    (GGUF model on GPU)    │  Token generation, GPU offload
 └──────────────────────────┘
 ```
@@ -38,36 +44,58 @@ Tool Calling Mini/
 
 ### What It Does
 
-1. **Fine-tunes** Qwen3-4B-Instruct on ~498 tool-calling examples using QLoRA via Unsloth
-2. **Exports** the trained LoRA adapter merged into a quantized GGUF model (Q4_K_M)
+1. **Fine-tunes** Qwen3 models on ~498 tool-calling examples using QLoRA via Unsloth
+2. **Exports** the trained LoRA adapter merged into a quantized GGUF model
 3. **Serves** the model through a FastAPI API backed by llama.cpp for GPU-accelerated inference
-4. **Authenticates** clients with HMAC-SHA256 rotating API keys (5-minute windows)
+4. **Executes tools** server-side via an agent loop (weather, calendar, Spotify, etc.) and passes client-side tool calls through for local execution
+5. **Authenticates** clients with HMAC-SHA256 rotating API keys (5-minute windows)
 
 ### Structure
 
 ```
 Model/
-├── server.py                       # FastAPI inference server (entry point)
-├── .env                            # INFERENCE_REFRESH_TOKEN
+├── server.py                           # FastAPI inference server (entry point)
+├── agent.py                            # Multi-turn agent loop (tool call → result → re-prompt)
+├── context.py                          # Token-aware context manager for inference
+├── .env                                # INFERENCE_REFRESH_TOKEN
 ├── inference/
-│   ├── inference.py                # Core functions: prompt building, tool-call parsing
-│   ├── export_gguf.py              # LoRA merge + GGUF conversion
-│   ├── validate.py                 # Automated test suite (19 cases)
-│   └── convert_hf_to_gguf.py      # HuggingFace → GGUF converter
-└── model_qwen4_finetuning/
-    ├── config.yaml                 # Single source of truth for all config
-    ├── run.py                      # Full pipeline runner
-    ├── tool_calling_config.json    # 12 tool schemas
-    ├── data/
-    │   ├── prepare_dataset.py      # JSONL → tokenized parquet
-    │   └── training_data.jsonl     # Raw training examples
-    ├── training/
-    │   └── train.py                # QLoRA fine-tuning script
-    └── output/
-        ├── lora_adapter/           # Trained LoRA weights + checkpoints
-        ├── merged_model/           # Full merged model
-        └── gguf/                   # Quantized GGUF files
+│   ├── inference.py                    # Prompt building, tool-call parsing, llama-server mgmt
+│   ├── export_gguf.py                  # LoRA merge + GGUF conversion
+│   └── validate.py                     # Automated test suite (19 hardcoded cases)
+├── model_qwen4_finetuning/
+│   ├── config.yaml                     # Single source of truth for all config
+│   ├── run.py                          # Full pipeline runner
+│   ├── tool_calling_config.json        # 12 tool schemas
+│   ├── data/
+│   │   ├── prepare_dataset.py          # JSONL → tokenized parquet
+│   │   └── training_data.jsonl         # Raw training examples
+│   ├── training/
+│   │   └── train.py                    # QLoRA fine-tuning script
+│   └── output/                         # Trained weights, merged model, GGUF files
+├── tools/
+│   ├── models.py                       # Pydantic validation for all 12 tools
+│   ├── executor.py                     # ToolExecutor — dispatch with timeout handling
+│   ├── weather.py, spotify.py, ...     # Individual tool implementations
+│   └── system_info.py                  # Internal system architecture docs
+├── clients/
+│   ├── weather_client.py               # Open-Meteo API client
+│   ├── calendar_client.py              # Google Calendar API client
+│   ├── kasa_lighting_client.py         # TP-Link Kasa LAN client
+│   └── web_search_client.py            # Google Custom Search client
+└── tool_calling_sdk/
+    ├── __init__.py                     # Exports ContextManager, LocalToolExecutor
+    ├── context.py                      # Shared conversation context management
+    └── executor.py                     # Client-side tool executor for local tools
 ```
+
+### Model Registry
+
+The server supports multiple model profiles via `config.yaml`. The active model is selected by the `active_model` key.
+
+| Profile | Model | Quantization |
+|---|---|---|
+| `qwen3-4b` | Qwen3-4B-Instruct-2507 | Q4_K_M |
+| `qwen3-8b` (active) | Qwen3-8B | Q4_0 |
 
 ### API Endpoints
 
@@ -76,6 +104,19 @@ Model/
 | `/health` | GET | No | Health check (FastAPI + llama-server status) |
 | `/auth/token` | POST | No | Exchange refresh token for a 5-minute API key |
 | `/v1/chat/completions` | POST | Yes | Chat completions with tool-call support |
+| `/v1/chat/completions/stream` | POST | Yes | Streaming chat via Server-Sent Events |
+| `/tools` | GET | Yes | List all registered tool schemas |
+| `/models` | GET | No | List available models and active selection |
+
+### Server-Side vs Client-Side Tools
+
+Tools are split between server and client execution:
+
+| Executed on Server | Passed Through to Client |
+|---|---|
+| `weather`, `spotify_playback`, `calendar_data`, `google_search`, `briefing`, `get_notifications`, `system_info` | `stickies`, `clipboard`, `send_sms`, `cursor_composer`, `kasa_lighting` |
+
+Server-side tools are executed automatically after the model produces tool calls. Client-side tools are returned in `tool_calls` for the client to execute locally (they require macOS apps, LAN devices, or filesystem access).
 
 ### Running the Server
 
@@ -114,7 +155,8 @@ python run.py --stop export       # Stop before validation
 - **llama.cpp** — GPU-accelerated inference engine
 - **Unsloth** — QLoRA training
 - **HuggingFace Transformers** — Model loading and tokenization
-- **Pydantic** — Request/response validation
+- **Pydantic** — Request/response and tool-call validation
+- **httpx** — Async HTTP for streaming proxied responses
 
 ---
 
@@ -183,12 +225,85 @@ if response.tool_calls:
         print(f"Tool: {tc.name}, Args: {tc.arguments}")
 ```
 
-### Tech Stack (Client)
+### Tech Stack (Client-CLI)
 
 - **Requests** — HTTP client
 - **Rich** — Terminal UI (panels, tables, markdown, spinners)
 - **Pydantic** — Data validation
 - **PyYAML** + **python-dotenv** — Configuration
+
+---
+
+## Client — `Client-Web/`
+
+### What It Does
+
+1. **Web chat interface** with streaming responses via Server-Sent Events
+2. **Backend proxy** that manages sessions, conversation history, and auth with the inference server
+3. **Settings panel** for adjusting generation parameters and switching models
+4. **Training data approval** workflow for curating good prompt/response pairs
+
+### Structure
+
+```
+Client-Web/
+├── backend/
+│   └── main.py             # FastAPI proxy (:8001) — sessions, config, model switching
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx          # Main chat component — rendering, streaming, settings
+│   │   ├── api.ts           # API client functions
+│   │   ├── types.ts         # TypeScript interfaces for API types
+│   │   └── main.tsx         # React entry point
+│   └── vite.config.ts       # Vite config with backend proxy
+├── config.yaml              # Backend configuration
+└── data/
+    └── approved_samples.jsonl  # Approved training data from the UI
+```
+
+### Running
+
+```bash
+# Terminal 1: Backend
+cd Client-Web/backend
+pip install -r requirements.txt
+python main.py                    # → http://localhost:8001
+
+# Terminal 2: Frontend (dev)
+cd Client-Web/frontend
+npm install && npm run dev        # → http://localhost:5173
+```
+
+### Tech Stack (Client-Web)
+
+- **React** + **TypeScript** + **Vite** — Frontend
+- **FastAPI** — Backend proxy with session management
+
+---
+
+## Inference Test Suite — `Inference-Test-Suite/`
+
+Validates tool-calling accuracy by sampling from the training dataset, querying the model, and comparing predicted tool calls against ground truth.
+
+### Accuracy Tiers
+
+| Tier | What It Checks |
+|---|---|
+| **Strict** | Correct tool names AND matching argument values |
+| **Routing** | Correct tool selected (ignoring argument values) |
+| **Format** | Valid `{"name": ..., "arguments": ...}` JSON structure |
+
+### Running
+
+```bash
+cd Inference-Test-Suite
+pip install -r requirements.txt
+
+python run.py                                    # 25 random samples
+python run.py --samples 50 --seed 42 --verbose   # Reproducible with detail
+```
+
+Requires a running llama-server instance (talks directly to `/completion`, not the FastAPI server).
 
 ---
 
@@ -205,7 +320,7 @@ The model is fine-tuned to call 12 tools:
 | `stickies` | Desktop sticky notes (read/edit) |
 | `send_sms` | Send iMessage/text to phone |
 | `google_search` | Web search |
-| `read_clipboard` | Read system clipboard contents |
+| `clipboard` | Read system clipboard contents |
 | `briefing` | Spoken briefing announcements |
 | `get_notifications` | Check pending notifications (email, news) |
 | `system_info` | Internal system architecture docs |
@@ -215,7 +330,7 @@ The model is fine-tuned to call 12 tools:
 
 ## Authentication Flow
 
-Both the server and client share a permanent **refresh token** (`INFERENCE_REFRESH_TOKEN`). The auth flow works as follows:
+Both the server and clients share a permanent **refresh token** (`INFERENCE_REFRESH_TOKEN`). The auth flow works as follows:
 
 1. Client sends `POST /auth/token` with the refresh token
 2. Server derives a short-lived API key using HMAC-SHA256 over a 5-minute time window
@@ -228,9 +343,9 @@ Both the server and client share a permanent **refresh token** (`INFERENCE_REFRE
 
 ### Server (`Model/model_qwen4_finetuning/config.yaml`)
 
-Central config for model selection, LoRA parameters, training hyperparameters, export settings, and inference/generation defaults. All paths are relative to this file.
+Central config for model registry, LoRA parameters, training hyperparameters, export settings, inference/generation defaults, and agent tool execution settings. All paths are relative to this file.
 
-### Client (`Client-CLI/config.yaml`)
+### Client-CLI (`Client-CLI/config.yaml`)
 
 ```yaml
 server:
@@ -251,6 +366,16 @@ generation:
 conversation:
   max_history_messages: 10
 ```
+
+---
+
+## Scripts — `scripts/`
+
+| Script | Purpose |
+|---|---|
+| `generate_openclaw_spec.py` | Regenerates `INTEGRATION_API.md` from `tool_calling_config.json` |
+| `install-hooks.sh` | Installs git hooks (run once after cloning) |
+| `pre-commit` | Auto-regenerates the integration spec on relevant commits |
 
 ---
 

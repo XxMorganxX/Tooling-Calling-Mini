@@ -217,3 +217,24 @@ agent:
   # Per-tool execution timeout in seconds
   tool_timeout: 30.0
 
+  # Tools executed on the server (remote APIs, no local machine requirement).
+  # The server registers and runs only these tools.
+  server_side_tools:
+    - weather
+    - spotify_playback
+    - calendar_data
+    - google_search
+    - briefing
+    - get_notifications
+    - system_info
+
+  # Tools that require local machine access (macOS apps, filesystem, LAN devices).
+  # The server passes these calls through in tool_calls without executing them.
+  # Clients use LocalToolExecutor from tool_calling_sdk to run them locally.
+  client_side_tools:
+    - stickies
+    - clipboard
+    - send_sms
+    - cursor_composer
+    - kasa_lighting
+

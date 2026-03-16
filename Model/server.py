@@ -225,9 +225,12 @@ async def lifespan(application: FastAPI):
             flash_attn=infer_cfg.get("flash_attn", False),
         )
 
-    # Initialize tool executor
-    tool_executor = ToolExecutor(timeout=cfg.get("agent", {}).get("tool_timeout", 30.0))
-    tool_executor.register_all_tools()
+    # Initialize tool executor — register only server-side tools from config
+    agent_cfg = cfg.get("agent", {})
+    server_side_tools = agent_cfg.get("server_side_tools", None)  # None = all tools
+
+    tool_executor = ToolExecutor(timeout=agent_cfg.get("tool_timeout", 30.0))
+    tool_executor.register_all_tools(server_side_tools)
 
     application.state.llama_host = host
     application.state.llama_port = port
@@ -237,6 +240,7 @@ async def lifespan(application: FastAPI):
     application.state.gen_params = gen_params
     application.state.enable_thinking = infer_cfg.get("enable_thinking", True)
     application.state.tool_executor = tool_executor
+    application.state.server_side_tools = set(server_side_tools) if server_side_tools else None
     application.state.active_model = active_model
     application.state.available_models = list_available_models(cfg)
 
@@ -279,6 +283,21 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+# ---------------------------------------------------------------------------
+# Tools
+# ---------------------------------------------------------------------------
+
+
+@app.get("/tools", dependencies=[Depends(verify_api_key)])
+async def list_tools():
+    tools = app.state.tools
+    lines = [f"**Available tools** ({len(tools)})\n"]
+    for t in tools:
+        fn = t["function"]
+        lines.append(f"**`{fn['name']}`** — {fn.get('description', 'No description')}")
+    return {"markdown": "\n".join(lines)}
 
 
 # ---------------------------------------------------------------------------
@@ -413,14 +432,20 @@ async def chat_completions(req: ChatRequest):
             tokens_per_second=timings.get("predicted_per_second", 0.0),
         )
 
-    # Execute tools if requested and tool calls were parsed
+    # Execute tools if requested and tool calls were parsed.
+    # Only server-side tools are executed here; client-side tool calls are
+    # passed through in tool_calls for the client to execute locally.
     tool_results: list[ToolResultResponse] | None = None
     if tool_calls and req.execute_tools:
         executor: ToolExecutor = state.tool_executor
+        server_tools: set[str] | None = state.server_side_tools
         validated: list[ValidatedToolCall] = []
         immediate_errors: list[ToolResultResponse] = []
 
         for tc in tool_calls:
+            # Skip client-side tools — let them pass through unexecuted
+            if server_tools is not None and tc.name not in server_tools:
+                continue
             vr = validate_tool_call(tc.name, tc.arguments)
             if isinstance(vr, ToolValidationError):
                 immediate_errors.append(ToolResultResponse(

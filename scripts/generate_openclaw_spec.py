@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Regenerate OPENCLAW_API.md from the canonical tool definitions and API docs.
+Regenerate INTEGRATION_API.md from the canonical tool definitions and API docs.
 
 Run this whenever you add, remove, or modify tools in tool_calling_config.json.
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TOOL_CONFIG = REPO_ROOT / "Model" / "model_qwen4_finetuning" / "tool_calling_config.json"
-OUTPUT = REPO_ROOT / "OPENCLAW_API.md"
+OUTPUT = REPO_ROOT / "INTEGRATION_API.md"
 
 GITHUB_RAW_BASE = (
     "https://raw.githubusercontent.com/XxMorganxX/Tooling-Calling-Mini/master"
@@ -224,6 +224,7 @@ def generate():
         {{"role": "user", "content": "What's the weather tomorrow?"}}
       ],
       "enable_thinking": true,
+      "execute_tools": true,
       "generation": {{
         "max_tokens": 512,
         "temperature": 0.6,
@@ -237,8 +238,9 @@ def generate():
 
     | Field | Type | Required | Default | Description |
     |---|---|---|---|---|
-    | `messages` | array | **yes** | — | Conversation history. Each: `{{"role": "user"|"assistant", "content": "..."}}` |
+    | `messages` | array | **yes** | — | Conversation history. Each: `{{"role": "user"|"assistant"|"tool"|"system", "content": "..."}}` |
     | `enable_thinking` | bool | no | `true` | Model produces a reasoning trace before responding. |
+    | `execute_tools` | bool | no | `true` | Execute server-side tools automatically. Set to `false` to get tool calls without execution. |
     | `generation` | object | no | server defaults | Override sampling params (all sub-fields optional). |
 
     The server is **stateless** — send the full conversation history each request.
@@ -260,6 +262,15 @@ def generate():
           "arguments": {{"specific_date": "tomorrow"}}
         }}
       ],
+      "tool_results": [
+        {{
+          "tool_name": "weather",
+          "success": true,
+          "result": {{"temperature": 72, "conditions": "Partly cloudy"}},
+          "error": null,
+          "duration_ms": 230.5
+        }}
+      ],
       "usage": {{
         "prompt_tokens": 1842,
         "completion_tokens": 67,
@@ -272,8 +283,8 @@ def generate():
     |---|---|---|---|
     | `content` | string | no | Cleaned response text (tool-call artifacts stripped). |
     | `thinking` | string | yes | Reasoning trace. Null if disabled or not produced. |
-    | `tool_calls` | array | yes | Parsed tool calls. **Null when no tools needed.** |
-    | `tool_results` | array | yes | Present only if server-side tool execution is enabled. |
+    | `tool_calls` | array | yes | Parsed tool calls. **Null when no tools needed.** Includes both server-side and client-side tool calls. |
+    | `tool_results` | array | yes | Results from server-side tool execution. Null if `execute_tools` is false or no server-side tools were called. |
     | `usage` | object | yes | Token counts and generation speed. |
 
     Each `tool_calls` entry:
@@ -282,6 +293,16 @@ def generate():
     |---|---|
     | `name` | Tool name (string) |
     | `arguments` | JSON object matching the tool's schema |
+
+    Each `tool_results` entry:
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `tool_name` | string | Name of the tool that was executed |
+    | `success` | bool | Whether execution succeeded |
+    | `result` | any | Tool output (structure varies by tool). Null on failure. |
+    | `error` | string | Error message. Null on success. |
+    | `duration_ms` | float | Execution time in milliseconds |
 
     ### Error codes
 
@@ -419,7 +440,7 @@ def generate():
     The raw-file URL for periodic polling:
 
     ```
-    {GITHUB_RAW_BASE}/OPENCLAW_API.md
+    {GITHUB_RAW_BASE}/INTEGRATION_API.md
     ```
 
     The raw tool config JSON (if you prefer to parse schemas directly):
@@ -434,7 +455,7 @@ def generate():
       `.git/hooks/pre-commit` so the spec regenerates on every commit that touches
       `tool_calling_config.json`.
     - **GitHub Action**: Trigger on pushes to `Model/model_qwen4_finetuning/tool_calling_config.json`
-      and auto-commit the regenerated `OPENCLAW_API.md`.
+      and auto-commit the regenerated `INTEGRATION_API.md`.
     - **Polling**: Have openclaw fetch the raw URL on a schedule (e.g. every 15 minutes)
       and diff against its cached copy.
 
